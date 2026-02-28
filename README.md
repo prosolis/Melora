@@ -30,22 +30,30 @@ cp .env.example .env
 
 Edit `.env` with your actual values (see [Environment Variables](#environment-variables) below).
 
-### 2. Verify your configuration
+### 2. Set up a virtual environment
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+### 3. Verify your configuration
+
+```bash
 python -m app --check
 ```
 
 This validates that all required environment variables are set, the Matrix homeserver is reachable, the bot token is valid, the bot has joined the announcements room, and the database path is writable. Fix any failing checks before starting the server.
 
-### 3. Run locally
+### 4. Run locally
 
 ```bash
+source .venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 4. Run with Docker
+### 5. Run with Docker
 
 ```bash
 docker build -t melora .
