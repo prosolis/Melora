@@ -15,12 +15,11 @@ def format_radarr(payload: dict) -> tuple[str, str]:
     year = movie.get("year", "")
     is_upgrade = payload.get("isUpgrade", False)
 
-    quality = (
-        payload.get("movieFile", {})
-        .get("quality", {})
-        .get("quality", {})
-        .get("name", "Unknown")
-    )
+    quality_field = payload.get("movieFile", {}).get("quality", {})
+    if isinstance(quality_field, dict):
+        quality = quality_field.get("quality", {}).get("name", "Unknown")
+    else:
+        quality = str(quality_field) if quality_field else "Unknown"
 
     if is_upgrade:
         lines = [
@@ -90,11 +89,11 @@ def format_lidarr(payload: dict) -> tuple[str, str]:
 
     track_files = payload.get("trackFiles", [{}])
     tf = track_files[0] if track_files else {}
-    quality = (
-        tf.get("quality", {})
-        .get("quality", {})
-        .get("name", "Unknown")
-    )
+    quality_field = tf.get("quality", {})
+    if isinstance(quality_field, dict):
+        quality = quality_field.get("quality", {}).get("name", "Unknown")
+    else:
+        quality = str(quality_field) if quality_field else "Unknown"
 
     header = f"\U0001f3b5 **{artist_name}**"
     if album_title:
