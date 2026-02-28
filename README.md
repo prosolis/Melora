@@ -261,6 +261,103 @@ Melora/
 - Parsing and Matrix posting errors are logged but don't crash the service
 - Missing thread roots on startup halt with a clear error
 
+## Securing Webhooks
+
+By default, webhook traffic (including the `X-Arr-Webhook-Secret` header) is sent over plain HTTP. Anyone who can observe network traffic between your \*arr instances and Melora can read the secret. The two recommended mitigations are a TLS reverse proxy and IP allowlisting — ideally both.
+
+### 1. TLS via Caddy reverse proxy
+
+[Caddy](https://caddyserver.com/) is the simplest option because it provisions and renews Let's Encrypt certificates automatically. Any reverse proxy that terminates TLS will work (nginx, Traefik, etc.) — Caddy just requires the least configuration.
+
+#### Install Caddy
+
+```bash
+# Debian / Ubuntu
+sudo apt install -y caddy
+
+# Or with Docker
+docker pull caddy:latest
+```
+
+#### Configure
+
+Create (or edit) `/etc/caddy/Caddyfile`:
+
+```
+melora.example.com {
+    reverse_proxy localhost:8000
+}
+```
+
+Replace `melora.example.com` with your actual domain. Caddy will automatically obtain a TLS certificate and redirect HTTP to HTTPS.
+
+```bash
+sudo systemctl restart caddy
+```
+
+#### Update your \*arr webhook URLs
+
+In each \*arr instance, change the webhook URL from:
+
+```
+http://melora-host:8000/webhook/radarr
+```
+
+to:
+
+```
+https://melora.example.com/webhook/radarr
+```
+
+The `X-Arr-Webhook-Secret` header is now encrypted in transit.
+
+### 2. IP allowlisting
+
+Restrict the webhook endpoints so only your \*arr server(s) can reach them. This works regardless of whether you use TLS, and is a good defense-in-depth layer.
+
+#### Option A: At the reverse proxy (Caddy)
+
+Add a `remote_ip` matcher to your Caddyfile:
+
+```
+melora.example.com {
+    @allowed remote_ip 192.168.1.50 192.168.1.51
+    handle @allowed {
+        reverse_proxy localhost:8000
+    }
+    respond 403
+}
+```
+
+Replace the IPs with the actual addresses of your Radarr/Sonarr/Lidarr hosts. If everything runs on the same machine, use `127.0.0.1`.
+
+#### Option B: With a firewall (iptables / nftables)
+
+If you aren't using a reverse proxy, restrict at the OS level:
+
+```bash
+# Allow only 192.168.1.50 to reach Melora on port 8000
+sudo iptables -A INPUT -p tcp --dport 8000 -s 192.168.1.50 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 8000 -j DROP
+```
+
+To persist across reboots:
+
+```bash
+sudo apt install -y iptables-persistent
+sudo netfilter-persistent save
+```
+
+### Recommended setup
+
+| Layer | What it does |
+|-------|-------------|
+| **Caddy (TLS)** | Encrypts all traffic, including the webhook secret header |
+| **IP allowlist** | Ensures only your \*arr hosts can reach the endpoint at all |
+| **Webhook secret** | Authenticates requests in case the IP filter is misconfigured |
+
+All three layers together give defense in depth — any single layer failing still leaves the other two in place.
+
 ## License
 
 See repository for license details.
