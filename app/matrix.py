@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from nio import AsyncClient, RoomSendResponse
+from nio import AsyncClient, PresenceSetError, RoomSendResponse
 
 from app.config import config
 
@@ -48,7 +48,9 @@ async def close_client() -> None:
 
 async def _set_presence(state: str) -> None:
     client = await get_client()
-    await client.set_presence(state)
+    resp = await client.set_presence(state)
+    if isinstance(resp, PresenceSetError):
+        raise RuntimeError(f"Presence update to '{state}' failed: {resp.message}")
 
 
 async def _presence_loop() -> None:
