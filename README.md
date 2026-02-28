@@ -30,17 +30,30 @@ cp .env.example .env
 
 Edit `.env` with your actual values (see [Environment Variables](#environment-variables) below).
 
-### 2. Run locally
+### 2. Verify your configuration
 
 ```bash
 pip install -r requirements.txt
+python -m app --check
+```
+
+This validates that all required environment variables are set, the Matrix homeserver is reachable, the bot token is valid, the bot has joined the announcements room, and the database path is writable. Fix any failing checks before starting the server.
+
+### 3. Run locally
+
+```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### 3. Run with Docker
+### 4. Run with Docker
 
 ```bash
 docker build -t melora .
+
+# Verify configuration first
+docker run --rm --env-file .env melora python -m app --check
+
+# Start the service
 docker run -d \
   --name melora \
   --env-file .env \
@@ -220,7 +233,9 @@ Messages include both plain text and HTML (Matrix-flavored Markdown). New additi
 Melora/
 ├── app/
 │   ├── __init__.py
+│   ├── __main__.py      # CLI entry point (--check flag)
 │   ├── main.py          # FastAPI app, lifespan, startup
+│   ├── check.py         # Configuration and connectivity checker
 │   ├── config.py        # Environment variable loading
 │   ├── database.py      # Async SQLite for thread roots and dedup
 │   ├── matrix.py        # matrix-nio posting and thread management
