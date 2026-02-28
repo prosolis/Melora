@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from nio import AsyncClient, RoomSendResponse
@@ -7,6 +8,9 @@ from app.config import config
 log = logging.getLogger(__name__)
 
 _client: AsyncClient | None = None
+_presence_task: asyncio.Task | None = None
+
+PRESENCE_INTERVAL_SECONDS = 60
 
 THREAD_ROOT_MESSAGES: dict[str, str] = {
     "movies": "\U0001f3ac Movies",
@@ -25,10 +29,39 @@ async def get_client() -> AsyncClient:
 
 
 async def close_client() -> None:
-    global _client
+    global _client, _presence_task
+    if _presence_task is not None:
+        _presence_task.cancel()
+        try:
+            await _presence_task
+        except asyncio.CancelledError:
+            pass
+        _presence_task = None
     if _client is not None:
+        await _set_presence("offline")
         await _client.close()
         _client = None
+
+
+async def _set_presence(state: str) -> None:
+    client = await get_client()
+    try:
+        await client.set_presence(state)
+    except Exception:
+        log.debug("Presence update failed", exc_info=True)
+
+
+async def _presence_loop() -> None:
+    while True:
+        await _set_presence("online")
+        await asyncio.sleep(PRESENCE_INTERVAL_SECONDS)
+
+
+async def start_presence() -> None:
+    global _presence_task
+    await _set_presence("online")
+    _presence_task = asyncio.create_task(_presence_loop())
+    log.info("Presence heartbeat started (every %ds)", PRESENCE_INTERVAL_SECONDS)
 
 
 async def send_thread_root(media_type: str) -> str:
