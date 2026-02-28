@@ -38,23 +38,26 @@ async def close_client() -> None:
             pass
         _presence_task = None
     if _client is not None:
-        await _set_presence("offline")
+        try:
+            await _set_presence("offline")
+        except Exception:
+            log.warning("Failed to set offline presence during shutdown", exc_info=True)
         await _client.close()
         _client = None
 
 
 async def _set_presence(state: str) -> None:
     client = await get_client()
-    try:
-        await client.set_presence(state)
-    except Exception:
-        log.debug("Presence update failed", exc_info=True)
+    await client.set_presence(state)
 
 
 async def _presence_loop() -> None:
     while True:
-        await _set_presence("online")
         await asyncio.sleep(PRESENCE_INTERVAL_SECONDS)
+        try:
+            await _set_presence("online")
+        except Exception:
+            log.warning("Presence heartbeat failed", exc_info=True)
 
 
 async def start_presence() -> None:
