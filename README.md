@@ -62,21 +62,123 @@ docker run -d \
 
 ## *arr Configuration
 
-In each *arr instance, go to **Settings → Connect → Add → Webhook** and configure:
+Melora receives push notifications from each *arr app via their built-in **Connect / Webhook** system. The setup is nearly identical across Radarr, Sonarr, and Lidarr — only the webhook URL path differs.
 
-- **URL**: `http://melora-host:8000/webhook/radarr` (or `/sonarr`, `/lidarr`)
-- **Method**: `POST`
-- **Events**: Enable **On Import** (and **On Upgrade** if desired)
-- **Tags**: Leave blank to capture all imports
-- **Headers**: Add `X-Arr-Webhook-Secret` with the same value as `WEBHOOK_SECRET`
+> **Prerequisite:** Before configuring any *arr instance, make sure Melora is running and reachable from the machine that hosts your *arr apps. You can verify by hitting the health endpoint:
+> ```bash
+> curl http://melora-host:8000/health
+> # Expected: {"status":"ok"}
+> ```
+
+---
+
+### Radarr (Movies)
+
+1. Open Radarr → **Settings** → **Connect**
+2. Click **+** to add a new connection and select **Webhook**
+3. Fill in the following fields:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Melora` (or any label you like) |
+| **On Grab** | Off |
+| **On Import** | **On** |
+| **On Upgrade** | **On** (if you want upgrade notifications) |
+| **On Rename** | Off |
+| **On Movie Added** | Off |
+| **On Movie Delete** | Off |
+| **On Movie File Delete** | Off |
+| **On Health Issue** | Off |
+| **Tags** | Leave blank (all movies) or choose specific tags |
+| **URL** | `http://melora-host:8000/webhook/radarr` |
+| **Method** | `POST` |
+| **Username** | _(leave blank)_ |
+| **Password** | _(leave blank)_ |
+
+4. Under **Request Headers**, add a header:
+   - **Key:** `X-Arr-Webhook-Secret`
+   - **Value:** The same value you set for `WEBHOOK_SECRET` in your `.env`
+5. Click **Test** — you should see a green check. Then click **Save**.
+
+---
+
+### Sonarr (TV Shows)
+
+1. Open Sonarr → **Settings** → **Connect**
+2. Click **+** to add a new connection and select **Webhook**
+3. Fill in the following fields:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Melora` |
+| **On Grab** | Off |
+| **On Import** | **On** |
+| **On Upgrade** | **On** (if you want upgrade notifications) |
+| **On Rename** | Off |
+| **On Series Add** | Off |
+| **On Series Delete** | Off |
+| **On Episode File Delete** | Off |
+| **On Health Issue** | Off |
+| **Tags** | Leave blank (all series) or choose specific tags |
+| **URL** | `http://melora-host:8000/webhook/sonarr` |
+| **Method** | `POST` |
+| **Username** | _(leave blank)_ |
+| **Password** | _(leave blank)_ |
+
+4. Under **Request Headers**, add a header:
+   - **Key:** `X-Arr-Webhook-Secret`
+   - **Value:** The same value you set for `WEBHOOK_SECRET` in your `.env`
+5. Click **Test** — you should see a green check. Then click **Save**.
+
+---
+
+### Lidarr (Music)
+
+1. Open Lidarr → **Settings** → **Connect**
+2. Click **+** to add a new connection and select **Webhook**
+3. Fill in the following fields:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Melora` |
+| **On Grab** | Off |
+| **On Import** | **On** |
+| **On Upgrade** | **On** (if you want upgrade notifications) |
+| **On Rename** | Off |
+| **On Album Delete** | Off |
+| **On Artist Delete** | Off |
+| **On Health Issue** | Off |
+| **Tags** | Leave blank (all artists) or choose specific tags |
+| **URL** | `http://melora-host:8000/webhook/lidarr` |
+| **Method** | `POST` |
+| **Username** | _(leave blank)_ |
+| **Password** | _(leave blank)_ |
+
+4. Under **Request Headers**, add a header:
+   - **Key:** `X-Arr-Webhook-Secret`
+   - **Value:** The same value you set for `WEBHOOK_SECRET` in your `.env`
+5. Click **Test** — you should see a green check. Then click **Save**.
+
+---
+
+### Troubleshooting *arr Webhooks
+
+| Symptom | Likely Cause | Fix |
+|---------|-------------|-----|
+| Test button shows red X | Melora is unreachable from the *arr host | Verify the URL, port, and any firewall rules between the hosts |
+| Test passes but no Matrix messages appear | The Test event type is `Test`, not `Download` — Melora ignores it by design | Import a real file or trigger a manual import to generate a `Download` event |
+| 401 Unauthorized in Melora logs | Secret mismatch | Ensure `X-Arr-Webhook-Secret` header value exactly matches the `WEBHOOK_SECRET` in Melora's `.env` |
+| Duplicate notifications | Same media re-imported | Melora deduplicates by media ID — duplicates are silently ignored. If you see duplicates, check if the media has a different internal ID |
+
+> **Note:** Melora only processes events with `eventType: "Download"`. This is the event type that Radarr/Sonarr/Lidarr send when a file is actually imported (not when it is grabbed from an indexer). All other event types are acknowledged with a `200 OK` but silently ignored.
 
 ## Webhook Endpoints
 
 ```
-POST /webhook/radarr
-POST /webhook/sonarr
-POST /webhook/lidarr
-GET  /health
+POST /webhook/radarr   — receives Radarr movie import events
+POST /webhook/sonarr   — receives Sonarr episode import events
+POST /webhook/lidarr   — receives Lidarr album import events
+GET  /health           — returns {"status": "ok"} when the service is running
 ```
 
 Each webhook endpoint validates the `X-Arr-Webhook-Secret` header, processes only `Download` events, and posts to the appropriate Matrix thread.
