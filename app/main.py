@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -12,8 +13,18 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="Melora")
-app.include_router(webhook_router)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.info("Starting Melora")
+    await init_db()
+    await _ensure_thread_roots()
+    await start_presence()
+    log.info("Melora ready")
+    yield
+    log.info("Shutting down Melora")
+    await close_client()
+    await close_db()
 
 
 async def _ensure_thread_roots() -> None:
@@ -27,20 +38,8 @@ async def _ensure_thread_roots() -> None:
         await set_thread_root(media_type, event_id)
 
 
-@app.on_event("startup")
-async def startup() -> None:
-    log.info("Starting Melora")
-    await init_db()
-    await _ensure_thread_roots()
-    await start_presence()
-    log.info("Melora ready")
-
-
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    log.info("Shutting down Melora")
-    await close_client()
-    await close_db()
+app = FastAPI(title="Melora", lifespan=lifespan)
+app.include_router(webhook_router)
 
 
 @app.get("/health")
