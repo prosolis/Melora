@@ -9,17 +9,27 @@ def _strip_markdown(text: str) -> str:
     return text.replace("**", "").replace("*", "").replace("> ", "")
 
 
+def _extract_quality(quality_obj) -> str:
+    """Extract quality name from *arr quality field, which may be a string or nested dict."""
+    if isinstance(quality_obj, str):
+        return quality_obj
+    if isinstance(quality_obj, dict):
+        inner = quality_obj.get("quality", quality_obj)
+        if isinstance(inner, str):
+            return inner
+        if isinstance(inner, dict):
+            return inner.get("name", "Unknown")
+    return "Unknown"
+
+
 def format_radarr(payload: dict) -> tuple[str, str]:
     movie = payload.get("movie", {})
     title = movie.get("title", "Unknown")
     year = movie.get("year", "")
     is_upgrade = payload.get("isUpgrade", False)
 
-    quality = (
-        payload.get("movieFile", {})
-        .get("quality", {})
-        .get("quality", {})
-        .get("name", "Unknown")
+    quality = _extract_quality(
+        payload.get("movieFile", {}).get("quality", {})
     )
 
     if is_upgrade:
@@ -52,11 +62,8 @@ def format_sonarr(payload: dict) -> tuple[str, str]:
     episode = ep.get("episodeNumber", 0)
     ep_title = ep.get("title", "")
 
-    quality = (
-        payload.get("episodeFile", {})
-        .get("quality", {})
-        .get("quality", {})
-        .get("name", "Unknown")
+    quality = _extract_quality(
+        payload.get("episodeFile", {}).get("quality", {})
     )
 
     header = f"\U0001f4fa **{series_title}** \u2014 S{season:02d}E{episode:02d}"
@@ -91,11 +98,7 @@ def format_lidarr(payload: dict) -> tuple[str, str]:
 
     track_files = payload.get("trackFiles", [{}])
     tf = track_files[0] if track_files else {}
-    quality = (
-        tf.get("quality", {})
-        .get("quality", {})
-        .get("name", "Unknown")
-    )
+    quality = _extract_quality(tf.get("quality", {}))
 
     header = f"\U0001f3b5 **{artist_name}**"
     if album_title:
