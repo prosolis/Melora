@@ -52,12 +52,11 @@ def format_sonarr(payload: dict) -> tuple[str, str]:
     episode = ep.get("episodeNumber", 0)
     ep_title = ep.get("title", "")
 
-    quality = (
-        payload.get("episodeFile", {})
-        .get("quality", {})
-        .get("quality", {})
-        .get("name", "Unknown")
-    )
+    quality_field = payload.get("episodeFile", {}).get("quality", {})
+    if isinstance(quality_field, dict):
+        quality = quality_field.get("quality", {}).get("name", "Unknown")
+    else:
+        quality = str(quality_field) if quality_field else "Unknown"
 
     header = f"\U0001f4fa **{series_title}** \u2014 S{season:02d}E{episode:02d}"
     if ep_title:
